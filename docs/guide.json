@@ -1,0 +1,10 @@
+{
+  "sections": [
+    {
+      "slug": "getting-started",
+      "title": "Getting started",
+      "description": "Build safe, composable HTML trees in Saga and render them to text.",
+      "group": "guide"
+    }
+  ]
+}

@@ -1,0 +1,139 @@
+module ProseHtmlTest
+
+import Std.Test (Testing, describe, test, assert_eq)
+
+import ProseHtml as Html
+
+pub fun tests : Unit -> Unit needs {Testing}
+tests () = {
+  describe "ProseHtml" (fun () -> {
+    test "renders nested html" (fun () -> {
+      Html.div [
+        Html.class "panel",
+      ] [Html.h1 [] [Html.text "Hello"], Html.p [] [Html.text "Welcome back."]]
+      |> Html.render
+      |> assert_eq "<div class=\"panel\"><h1>Hello</h1><p>Welcome back.</p></div>"
+    })
+
+    test "escapes text and attributes" (fun () -> {
+      Html.a [
+        Html.href "/search?q=<edda>&sort=\"new\"",
+      ] [Html.text "Prose < HTML & friends"]
+      |> Html.render
+      |> assert_eq "<a href=\"/search?q=&lt;edda&gt;&amp;sort=&quot;new&quot;\">Prose &lt; HTML &amp; friends</a>"
+    })
+
+    test "renders unsafe html verbatim" (fun () -> {
+      Html.div [] [Html.unsafe_html "<strong>ProseHtml</strong>"]
+      |> Html.render
+      |> assert_eq "<div><strong>ProseHtml</strong></div>"
+    })
+
+    test "uses the final attribute value" (fun () -> {
+      Html.button [
+        Html.class "base",
+        Html.class "primary",
+        Html.disabled,
+      ] [Html.text "Save"]
+      |> Html.render
+      |> assert_eq "<button class=\"primary\" disabled>Save</button>"
+    })
+
+    test "lets boolean and string attributes override each other" (fun () -> {
+      Html.input [Html.disabled, Html.attr "disabled" "false"]
+      |> Html.render
+      |> assert_eq "<input disabled=\"false\">"
+    })
+
+    test "joins class names" (fun () -> {
+      Html.div [
+        Html.classes [
+          "button",
+          "",
+          "  ",
+          Html.class_if True "button-primary",
+          Html.class_if False "hidden",
+        ],
+      ] []
+      |> Html.render
+      |> assert_eq "<div class=\"button button-primary\"></div>"
+    })
+
+    test "renders fragments without a wrapper" (fun () -> {
+      Html.fragment [Html.text "One", Html.br [], Html.text "Two"]
+      |> Html.render
+      |> assert_eq "One<br>Two"
+    })
+
+    test "renders common attribute helpers" (fun () -> {
+      Html.input [
+        Html.type_ "email",
+        Html.name "email",
+        Html.autocomplete "email",
+        Html.required,
+        Html.maxlength 120,
+        Html.aria "label" "Email",
+        Html.data_ "field" "contact",
+      ]
+      |> Html.render
+      |> assert_eq "<input type=\"email\" name=\"email\" autocomplete=\"email\" required maxlength=\"120\" aria-label=\"Email\" data-field=\"contact\">"
+    })
+
+    test "renders data and modern attribute helpers" (fun () -> {
+      Html.img [
+        Html.src "/hero.png",
+        Html.srcset "/hero.png 1x, /hero@2x.png 2x",
+        Html.fetchpriority "high",
+        Html.loading "eager",
+        Html.data_ "controller" "gallery",
+        Html.itemscope,
+        Html.itemtype "https://schema.org/ImageObject",
+      ]
+      |> Html.render
+      |> assert_eq "<img src=\"/hero.png\" srcset=\"/hero.png 1x, /hero@2x.png 2x\" fetchpriority=\"high\" loading=\"eager\" data-controller=\"gallery\" itemscope itemtype=\"https://schema.org/ImageObject\">"
+    })
+
+    test "renders a complete document" (fun () -> {
+      Html.document [
+        Html.lang "en",
+      ] [
+        Html.head_ [] [Html.title_ [] [Html.text "ProseHtml"]],
+        Html.body [] [Html.main_ [] [Html.h1 [] [Html.text "Hello"]]],
+      ]
+      |> Html.render
+      |> assert_eq "<!doctype html><html lang=\"en\"><head><title>ProseHtml</title></head><body><main><h1>Hello</h1></main></body></html>"
+    })
+
+    test "renders common element helpers" (fun () -> {
+      Html.fragment [
+        Html.figure [] [
+          Html.picture [] [
+            Html.source [Html.srcset "/cat.avif", Html.type_ "image/avif"],
+            Html.img [Html.src "/cat.jpg", Html.alt "Cat"],
+          ],
+          Html.figcaption [] [Html.em [] [Html.text "A cat"]],
+        ],
+        Html.details [
+          Html.open_,
+        ] [
+          Html.summary [] [Html.text "More"],
+          Html.dl [] [
+            Html.dt [] [Html.code [] [Html.text "type"]],
+            Html.dd [] [Html.text "image"],
+          ],
+        ],
+        Html.table [] [
+          Html.caption [] [Html.text "Numbers"],
+          Html.tbody [] [
+            Html.tr [] [
+              Html.th [Html.scope "row"] [Html.text "One"],
+              Html.td [] [Html.text "1"],
+            ],
+          ],
+        ],
+      ]
+      |> Html.render
+      |> assert_eq "<figure><picture><source srcset=\"/cat.avif\" type=\"image/avif\"><img src=\"/cat.jpg\" alt=\"Cat\"></picture><figcaption><em>A cat</em></figcaption></figure><details open><summary>More</summary><dl><dt><code>type</code></dt><dd>image</dd></dl></details><table><caption>Numbers</caption><tbody><tr><th scope=\"row\">One</th><td>1</td></tr></tbody></table>"
+    })
+  })
+}

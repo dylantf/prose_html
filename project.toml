@@ -1,0 +1,12 @@
+[project]
+name = "prose_html"
+
+[bin]
+main = "src/Main.saga"
+
+[library]
+module = "ProseHtml"
+expose = ["ProseHtml"]
+
+# [deps]
+# some-lib = { path = "../some-lib" }

@@ -1,0 +1,7 @@
+module Main
+
+import Std.IO (console)
+
+main () = {
+  println "Hello, world!"
+} with console

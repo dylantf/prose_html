@@ -1,0 +1,950 @@
+module ProseHtml
+
+#@ A composable HTML tree.
+pub type HtmlNode =
+  | Doctype
+  | Text String
+  | UnsafeHtml String
+  | Element String (List HtmlAttr) (List HtmlNode)
+  | VoidElement String (List HtmlAttr)
+  | Fragment (List HtmlNode)
+
+#@ An HTML attribute. Boolean attributes render without a value.
+pub type HtmlAttr =
+  | Attr String String
+  | BoolAttr String
+
+#@ Escapes text and renders it as an HTML text node.
+pub fun text : String -> HtmlNode
+text value = Text value
+
+#@ Renders an already-safe HTML string without escaping.
+pub fun unsafe_html : String -> HtmlNode
+unsafe_html value = UnsafeHtml value
+
+#@ Groups several nodes without adding a wrapper element.
+pub fun fragment : List HtmlNode -> HtmlNode
+fragment children = Fragment children
+
+#@ Creates a normal element with attributes and children.
+pub fun element : String -> List HtmlAttr -> List HtmlNode -> HtmlNode
+element tag attrs children = Element tag attrs children
+
+#@ Creates a void element with attributes and no children.
+pub fun void_element : String -> List HtmlAttr -> HtmlNode
+void_element tag attrs = VoidElement tag attrs
+
+#@ Creates a string-valued attribute.
+pub fun attr : String -> String -> HtmlAttr
+attr name value = Attr name value
+
+#@ Creates a boolean attribute.
+pub fun bool_attr : String -> HtmlAttr
+bool_attr name = BoolAttr name
+
+#@ Creates an integer-valued attribute.
+pub fun int_attr : String -> Int -> HtmlAttr
+int_attr name value = attr name (show value)
+
+#@ Creates an attribute whose value is either "true" or "false".
+pub fun bool_value_attr : String -> Bool -> HtmlAttr
+bool_value_attr name value = attr name (bool_value value)
+
+fun bool_value : Bool -> String
+bool_value value = if value then "true" else "false"
+
+#@ Renders the HTML5 doctype.
+pub fun doctype : HtmlNode
+doctype = Doctype
+
+#@ Creates a complete HTML document with an HTML5 doctype.
+pub fun document : List HtmlAttr -> List HtmlNode -> HtmlNode
+document attrs children = fragment [doctype, html attrs children]
+
+#@ Renders HTML to a string.
+pub fun render : HtmlNode -> String
+render node = case node {
+  Doctype -> "<!doctype html>"
+  Text value -> escape_text value
+  UnsafeHtml value -> value
+  Element tag attrs children -> "<"
+    <> tag
+    <> render_attrs attrs
+    <> ">"
+    <> render_children children
+    <> "</"
+    <> tag
+    <> ">"
+  VoidElement tag attrs -> "<" <> tag <> render_attrs attrs <> ">"
+  Fragment children -> render_children children
+}
+
+fun render_children : List HtmlNode -> String
+render_children children =
+  children
+  |> List.map render
+  |> String.join ""
+
+fun render_attrs : List HtmlAttr -> String
+render_attrs attrs =
+  attrs
+  |> normalize_attrs
+  |> List.map render_attr
+  |> String.join ""
+
+fun render_attr : HtmlAttr -> String
+render_attr attribute = case attribute {
+  Attr name value -> " " <> name <> "=\"" <> escape_attr value <> "\""
+  BoolAttr name -> " " <> name
+}
+
+fun normalize_attrs : List HtmlAttr -> List HtmlAttr
+normalize_attrs attrs = case attrs {
+  [] -> []
+  h :: t ->
+    if contains_attr_named (attr_name h) t then normalize_attrs t
+    else h :: normalize_attrs t
+}
+
+fun contains_attr_named : String -> List HtmlAttr -> Bool
+contains_attr_named name attrs = case attrs {
+  [] -> False
+  h :: t ->
+    if attr_name h == name then True
+    else contains_attr_named name t
+}
+
+fun attr_name : HtmlAttr -> String
+attr_name attribute = case attribute {
+  Attr name _ -> name
+  BoolAttr name -> name
+}
+
+fun escape_text : String -> String
+escape_text value =
+  value
+  |> String.replace_all "&" "&amp;"
+  |> String.replace_all "<" "&lt;"
+  |> String.replace_all ">" "&gt;"
+
+fun escape_attr : String -> String
+escape_attr value =
+  value
+  |> escape_text
+  |> String.replace_all "\"" "&quot;"
+  |> String.replace_all "'" "&#39;"
+
+pub fun id : String -> HtmlAttr
+id value = attr "id" value
+
+pub fun class : String -> HtmlAttr
+class value = attr "class" value
+
+#@ Joins non-blank class names into a class attribute.
+pub fun class_names : List String -> HtmlAttr
+class_names values =
+  values
+  |> List.filter non_blank_class
+  |> String.join " "
+  |> class
+
+#@ Alias for class_names.
+pub fun classes : List String -> HtmlAttr
+classes values = class_names values
+
+#@ Returns a class name when the condition is true, or an empty string otherwise.
+pub fun class_if : Bool -> String -> String
+class_if condition value = if condition then value else ""
+
+fun non_blank_class : String -> Bool
+non_blank_class value = String.trim value != ""
+
+pub fun accesskey : String -> HtmlAttr
+accesskey value = attr "accesskey" value
+
+pub fun autocapitalize : String -> HtmlAttr
+autocapitalize value = attr "autocapitalize" value
+
+pub fun autocorrect : String -> HtmlAttr
+autocorrect value = attr "autocorrect" value
+
+pub fun contenteditable : Bool -> HtmlAttr
+contenteditable value = bool_value_attr "contenteditable" value
+
+pub fun dir : String -> HtmlAttr
+dir value = attr "dir" value
+
+pub fun draggable : Bool -> HtmlAttr
+draggable value = bool_value_attr "draggable" value
+
+pub fun enterkeyhint : String -> HtmlAttr
+enterkeyhint value = attr "enterkeyhint" value
+
+pub fun headingoffset : Int -> HtmlAttr
+headingoffset value = int_attr "headingoffset" value
+
+pub fun inputmode : String -> HtmlAttr
+inputmode value = attr "inputmode" value
+
+pub fun is : String -> HtmlAttr
+is value = attr "is" value
+
+pub fun itemid : String -> HtmlAttr
+itemid value = attr "itemid" value
+
+pub fun itemprop : String -> HtmlAttr
+itemprop value = attr "itemprop" value
+
+pub fun itemref : String -> HtmlAttr
+itemref value = attr "itemref" value
+
+pub fun itemtype : String -> HtmlAttr
+itemtype value = attr "itemtype" value
+
+pub fun lang : String -> HtmlAttr
+lang value = attr "lang" value
+
+pub fun nonce : String -> HtmlAttr
+nonce value = attr "nonce" value
+
+pub fun part : String -> HtmlAttr
+part value = attr "part" value
+
+pub fun popover : String -> HtmlAttr
+popover value = attr "popover" value
+
+pub fun slot : String -> HtmlAttr
+slot value = attr "slot" value
+
+pub fun spellcheck : Bool -> HtmlAttr
+spellcheck value = bool_value_attr "spellcheck" value
+
+pub fun tabindex : Int -> HtmlAttr
+tabindex value = int_attr "tabindex" value
+
+pub fun translate : String -> HtmlAttr
+translate value = attr "translate" value
+
+pub fun xml_lang : String -> HtmlAttr
+xml_lang value = attr "xml:lang" value
+
+pub fun on : String -> String -> HtmlAttr
+on name value = attr ("on" <> name) value
+
+pub fun href : String -> HtmlAttr
+href value = attr "href" value
+
+pub fun hreflang : String -> HtmlAttr
+hreflang value = attr "hreflang" value
+
+pub fun src : String -> HtmlAttr
+src value = attr "src" value
+
+pub fun srcset : String -> HtmlAttr
+srcset value = attr "srcset" value
+
+pub fun sizes : String -> HtmlAttr
+sizes value = attr "sizes" value
+
+pub fun imagesrcset : String -> HtmlAttr
+imagesrcset value = attr "imagesrcset" value
+
+pub fun imagesizes : String -> HtmlAttr
+imagesizes value = attr "imagesizes" value
+
+pub fun alt : String -> HtmlAttr
+alt value = attr "alt" value
+
+pub fun coords : String -> HtmlAttr
+coords value = attr "coords" value
+
+pub fun shape : String -> HtmlAttr
+shape value = attr "shape" value
+
+pub fun title : String -> HtmlAttr
+title value = attr "title" value
+
+pub fun rel : String -> HtmlAttr
+rel value = attr "rel" value
+
+pub fun media : String -> HtmlAttr
+media value = attr "media" value
+
+pub fun ping : String -> HtmlAttr
+ping value = attr "ping" value
+
+pub fun referrerpolicy : String -> HtmlAttr
+referrerpolicy value = attr "referrerpolicy" value
+
+pub fun name : String -> HtmlAttr
+name value = attr "name" value
+
+pub fun value : String -> HtmlAttr
+value content = attr "value" content
+
+pub fun accept : String -> HtmlAttr
+accept value = attr "accept" value
+
+pub fun accept_charset : String -> HtmlAttr
+accept_charset value = attr "accept-charset" value
+
+pub fun alpha : String -> HtmlAttr
+alpha value = attr "alpha" value
+
+pub fun autocomplete : String -> HtmlAttr
+autocomplete value = attr "autocomplete" value
+
+pub fun capture : String -> HtmlAttr
+capture value = attr "capture" value
+
+pub fun colorspace : String -> HtmlAttr
+colorspace value = attr "colorspace" value
+
+pub fun dirname : String -> HtmlAttr
+dirname value = attr "dirname" value
+
+pub fun form_id : String -> HtmlAttr
+form_id value = attr "form" value
+
+pub fun formaction : String -> HtmlAttr
+formaction value = attr "formaction" value
+
+pub fun formenctype : String -> HtmlAttr
+formenctype value = attr "formenctype" value
+
+pub fun formmethod : String -> HtmlAttr
+formmethod value = attr "formmethod" value
+
+pub fun formtarget : String -> HtmlAttr
+formtarget value = attr "formtarget" value
+
+pub fun command : String -> HtmlAttr
+command value = attr "command" value
+
+pub fun commandfor : String -> HtmlAttr
+commandfor value = attr "commandfor" value
+
+pub fun list_id : String -> HtmlAttr
+list_id value = attr "list" value
+
+pub fun popovertarget : String -> HtmlAttr
+popovertarget value = attr "popovertarget" value
+
+pub fun popovertargetaction : String -> HtmlAttr
+popovertargetaction value = attr "popovertargetaction" value
+
+pub fun max : String -> HtmlAttr
+max value = attr "max" value
+
+pub fun maxlength : Int -> HtmlAttr
+maxlength value = int_attr "maxlength" value
+
+pub fun min : String -> HtmlAttr
+min value = attr "min" value
+
+pub fun minlength : Int -> HtmlAttr
+minlength value = int_attr "minlength" value
+
+pub fun low : String -> HtmlAttr
+low value = attr "low" value
+
+pub fun high : String -> HtmlAttr
+high value = attr "high" value
+
+pub fun optimum : String -> HtmlAttr
+optimum value = attr "optimum" value
+
+pub fun pattern : String -> HtmlAttr
+pattern value = attr "pattern" value
+
+pub fun placeholder : String -> HtmlAttr
+placeholder value = attr "placeholder" value
+
+pub fun size : Int -> HtmlAttr
+size value = int_attr "size" value
+
+pub fun step : String -> HtmlAttr
+step value = attr "step" value
+
+pub fun type_ : String -> HtmlAttr
+type_ value = attr "type" value
+
+pub fun for_ : String -> HtmlAttr
+for_ value = attr "for" value
+
+pub fun label_attr : String -> HtmlAttr
+label_attr value = attr "label" value
+
+pub fun role : String -> HtmlAttr
+role value = attr "role" value
+
+pub fun aria : String -> String -> HtmlAttr
+aria name value = attr ("aria-" <> name) value
+
+#@ Creates a data-* attribute.
+pub fun data_ : String -> String -> HtmlAttr
+data_ name value = attr ("data-" <> name) value
+
+pub fun data_attr : String -> HtmlAttr
+data_attr value = attr "data" value
+
+pub fun style : String -> HtmlAttr
+style value = attr "style" value
+
+pub fun method : String -> HtmlAttr
+method value = attr "method" value
+
+pub fun action : String -> HtmlAttr
+action value = attr "action" value
+
+pub fun enctype : String -> HtmlAttr
+enctype value = attr "enctype" value
+
+pub fun target : String -> HtmlAttr
+target value = attr "target" value
+
+pub fun charset : String -> HtmlAttr
+charset value = attr "charset" value
+
+pub fun content : String -> HtmlAttr
+content value = attr "content" value
+
+pub fun http_equiv : String -> HtmlAttr
+http_equiv value = attr "http-equiv" value
+
+pub fun property : String -> HtmlAttr
+property value = attr "property" value
+
+pub fun cite : String -> HtmlAttr
+cite value = attr "cite" value
+
+pub fun datetime : String -> HtmlAttr
+datetime value = attr "datetime" value
+
+pub fun cols : Int -> HtmlAttr
+cols value = int_attr "cols" value
+
+pub fun rows : Int -> HtmlAttr
+rows value = int_attr "rows" value
+
+pub fun wrap : String -> HtmlAttr
+wrap value = attr "wrap" value
+
+pub fun colspan : Int -> HtmlAttr
+colspan value = int_attr "colspan" value
+
+pub fun rowspan : Int -> HtmlAttr
+rowspan value = int_attr "rowspan" value
+
+pub fun headers : String -> HtmlAttr
+headers value = attr "headers" value
+
+pub fun scope : String -> HtmlAttr
+scope value = attr "scope" value
+
+pub fun abbr : String -> HtmlAttr
+abbr value = attr "abbr" value
+
+pub fun height : Int -> HtmlAttr
+height value = int_attr "height" value
+
+pub fun width : Int -> HtmlAttr
+width value = int_attr "width" value
+
+pub fun loading : String -> HtmlAttr
+loading value = attr "loading" value
+
+pub fun decoding : String -> HtmlAttr
+decoding value = attr "decoding" value
+
+pub fun crossorigin : String -> HtmlAttr
+crossorigin value = attr "crossorigin" value
+
+pub fun integrity : String -> HtmlAttr
+integrity value = attr "integrity" value
+
+pub fun as_ : String -> HtmlAttr
+as_ value = attr "as" value
+
+pub fun defer : HtmlAttr
+defer = bool_attr "defer"
+
+pub fun async_ : HtmlAttr
+async_ = bool_attr "async"
+
+pub fun nomodule : HtmlAttr
+nomodule = bool_attr "nomodule"
+
+pub fun poster : String -> HtmlAttr
+poster value = attr "poster" value
+
+pub fun preload : String -> HtmlAttr
+preload value = attr "preload" value
+
+pub fun controlslist : String -> HtmlAttr
+controlslist value = attr "controlslist" value
+
+pub fun kind : String -> HtmlAttr
+kind value = attr "kind" value
+
+pub fun srclang : String -> HtmlAttr
+srclang value = attr "srclang" value
+
+pub fun sandbox : String -> HtmlAttr
+sandbox value = attr "sandbox" value
+
+pub fun allow : String -> HtmlAttr
+allow value = attr "allow" value
+
+pub fun blocking : String -> HtmlAttr
+blocking value = attr "blocking" value
+
+pub fun color : String -> HtmlAttr
+color value = attr "color" value
+
+pub fun fetchpriority : String -> HtmlAttr
+fetchpriority value = attr "fetchpriority" value
+
+pub fun srcdoc : String -> HtmlAttr
+srcdoc value = attr "srcdoc" value
+
+pub fun usemap : String -> HtmlAttr
+usemap value = attr "usemap" value
+
+pub fun start : Int -> HtmlAttr
+start value = int_attr "start" value
+
+pub fun span_attr : Int -> HtmlAttr
+span_attr value = int_attr "span" value
+
+pub fun shadowrootmode : String -> HtmlAttr
+shadowrootmode value = attr "shadowrootmode" value
+
+pub fun shadowrootslotassignment : String -> HtmlAttr
+shadowrootslotassignment value = attr "shadowrootslotassignment" value
+
+pub fun allowfullscreen : HtmlAttr
+allowfullscreen = bool_attr "allowfullscreen"
+
+pub fun download : HtmlAttr
+download = bool_attr "download"
+
+pub fun download_as : String -> HtmlAttr
+download_as value = attr "download" value
+
+pub fun disabled : HtmlAttr
+disabled = bool_attr "disabled"
+
+pub fun checked : HtmlAttr
+checked = bool_attr "checked"
+
+pub fun selected : HtmlAttr
+selected = bool_attr "selected"
+
+pub fun readonly : HtmlAttr
+readonly = bool_attr "readonly"
+
+pub fun required : HtmlAttr
+required = bool_attr "required"
+
+pub fun autofocus : HtmlAttr
+autofocus = bool_attr "autofocus"
+
+pub fun hidden : HtmlAttr
+hidden = bool_attr "hidden"
+
+pub fun headingreset : HtmlAttr
+headingreset = bool_attr "headingreset"
+
+pub fun inert : HtmlAttr
+inert = bool_attr "inert"
+
+pub fun itemscope : HtmlAttr
+itemscope = bool_attr "itemscope"
+
+pub fun multiple : HtmlAttr
+multiple = bool_attr "multiple"
+
+pub fun formnovalidate : HtmlAttr
+formnovalidate = bool_attr "formnovalidate"
+
+pub fun novalidate : HtmlAttr
+novalidate = bool_attr "novalidate"
+
+pub fun open_ : HtmlAttr
+open_ = bool_attr "open"
+
+pub fun controls : HtmlAttr
+controls = bool_attr "controls"
+
+pub fun autoplay : HtmlAttr
+autoplay = bool_attr "autoplay"
+
+pub fun loop : HtmlAttr
+loop = bool_attr "loop"
+
+pub fun muted : HtmlAttr
+muted = bool_attr "muted"
+
+pub fun playsinline : HtmlAttr
+playsinline = bool_attr "playsinline"
+
+pub fun default_ : HtmlAttr
+default_ = bool_attr "default"
+
+pub fun reversed : HtmlAttr
+reversed = bool_attr "reversed"
+
+pub fun ismap : HtmlAttr
+ismap = bool_attr "ismap"
+
+pub fun shadowrootdelegatesfocus : HtmlAttr
+shadowrootdelegatesfocus = bool_attr "shadowrootdelegatesfocus"
+
+pub fun shadowrootclonable : HtmlAttr
+shadowrootclonable = bool_attr "shadowrootclonable"
+
+pub fun shadowrootserializable : HtmlAttr
+shadowrootserializable = bool_attr "shadowrootserializable"
+
+pub fun shadowrootcustomelementregistry : HtmlAttr
+shadowrootcustomelementregistry = bool_attr "shadowrootcustomelementregistry"
+
+pub fun html : List HtmlAttr -> List HtmlNode -> HtmlNode
+html attrs children = element "html" attrs children
+
+pub fun head_ : List HtmlAttr -> List HtmlNode -> HtmlNode
+head_ attrs children = element "head" attrs children
+
+pub fun body : List HtmlAttr -> List HtmlNode -> HtmlNode
+body attrs children = element "body" attrs children
+
+pub fun title_ : List HtmlAttr -> List HtmlNode -> HtmlNode
+title_ attrs children = element "title" attrs children
+
+pub fun style_ : List HtmlAttr -> List HtmlNode -> HtmlNode
+style_ attrs children = element "style" attrs children
+
+pub fun script : List HtmlAttr -> List HtmlNode -> HtmlNode
+script attrs children = element "script" attrs children
+
+pub fun noscript : List HtmlAttr -> List HtmlNode -> HtmlNode
+noscript attrs children = element "noscript" attrs children
+
+pub fun div : List HtmlAttr -> List HtmlNode -> HtmlNode
+div attrs children = element "div" attrs children
+
+pub fun span : List HtmlAttr -> List HtmlNode -> HtmlNode
+span attrs children = element "span" attrs children
+
+pub fun p : List HtmlAttr -> List HtmlNode -> HtmlNode
+p attrs children = element "p" attrs children
+
+pub fun a : List HtmlAttr -> List HtmlNode -> HtmlNode
+a attrs children = element "a" attrs children
+
+pub fun abbr_el : List HtmlAttr -> List HtmlNode -> HtmlNode
+abbr_el attrs children = element "abbr" attrs children
+
+pub fun address : List HtmlAttr -> List HtmlNode -> HtmlNode
+address attrs children = element "address" attrs children
+
+pub fun h1 : List HtmlAttr -> List HtmlNode -> HtmlNode
+h1 attrs children = element "h1" attrs children
+
+pub fun h2 : List HtmlAttr -> List HtmlNode -> HtmlNode
+h2 attrs children = element "h2" attrs children
+
+pub fun h3 : List HtmlAttr -> List HtmlNode -> HtmlNode
+h3 attrs children = element "h3" attrs children
+
+pub fun h4 : List HtmlAttr -> List HtmlNode -> HtmlNode
+h4 attrs children = element "h4" attrs children
+
+pub fun h5 : List HtmlAttr -> List HtmlNode -> HtmlNode
+h5 attrs children = element "h5" attrs children
+
+pub fun h6 : List HtmlAttr -> List HtmlNode -> HtmlNode
+h6 attrs children = element "h6" attrs children
+
+pub fun hgroup : List HtmlAttr -> List HtmlNode -> HtmlNode
+hgroup attrs children = element "hgroup" attrs children
+
+pub fun b : List HtmlAttr -> List HtmlNode -> HtmlNode
+b attrs children = element "b" attrs children
+
+pub fun bdi : List HtmlAttr -> List HtmlNode -> HtmlNode
+bdi attrs children = element "bdi" attrs children
+
+pub fun bdo : List HtmlAttr -> List HtmlNode -> HtmlNode
+bdo attrs children = element "bdo" attrs children
+
+pub fun blockquote : List HtmlAttr -> List HtmlNode -> HtmlNode
+blockquote attrs children = element "blockquote" attrs children
+
+pub fun cite_el : List HtmlAttr -> List HtmlNode -> HtmlNode
+cite_el attrs children = element "cite" attrs children
+
+pub fun code : List HtmlAttr -> List HtmlNode -> HtmlNode
+code attrs children = element "code" attrs children
+
+pub fun data_el : List HtmlAttr -> List HtmlNode -> HtmlNode
+data_el attrs children = element "data" attrs children
+
+pub fun del : List HtmlAttr -> List HtmlNode -> HtmlNode
+del attrs children = element "del" attrs children
+
+pub fun dfn : List HtmlAttr -> List HtmlNode -> HtmlNode
+dfn attrs children = element "dfn" attrs children
+
+pub fun em : List HtmlAttr -> List HtmlNode -> HtmlNode
+em attrs children = element "em" attrs children
+
+pub fun i : List HtmlAttr -> List HtmlNode -> HtmlNode
+i attrs children = element "i" attrs children
+
+pub fun ins : List HtmlAttr -> List HtmlNode -> HtmlNode
+ins attrs children = element "ins" attrs children
+
+pub fun kbd : List HtmlAttr -> List HtmlNode -> HtmlNode
+kbd attrs children = element "kbd" attrs children
+
+pub fun mark : List HtmlAttr -> List HtmlNode -> HtmlNode
+mark attrs children = element "mark" attrs children
+
+pub fun pre : List HtmlAttr -> List HtmlNode -> HtmlNode
+pre attrs children = element "pre" attrs children
+
+pub fun q : List HtmlAttr -> List HtmlNode -> HtmlNode
+q attrs children = element "q" attrs children
+
+pub fun rp : List HtmlAttr -> List HtmlNode -> HtmlNode
+rp attrs children = element "rp" attrs children
+
+pub fun rt : List HtmlAttr -> List HtmlNode -> HtmlNode
+rt attrs children = element "rt" attrs children
+
+pub fun ruby : List HtmlAttr -> List HtmlNode -> HtmlNode
+ruby attrs children = element "ruby" attrs children
+
+pub fun s : List HtmlAttr -> List HtmlNode -> HtmlNode
+s attrs children = element "s" attrs children
+
+pub fun samp : List HtmlAttr -> List HtmlNode -> HtmlNode
+samp attrs children = element "samp" attrs children
+
+pub fun small : List HtmlAttr -> List HtmlNode -> HtmlNode
+small attrs children = element "small" attrs children
+
+pub fun strong : List HtmlAttr -> List HtmlNode -> HtmlNode
+strong attrs children = element "strong" attrs children
+
+pub fun sub : List HtmlAttr -> List HtmlNode -> HtmlNode
+sub attrs children = element "sub" attrs children
+
+pub fun sup : List HtmlAttr -> List HtmlNode -> HtmlNode
+sup attrs children = element "sup" attrs children
+
+pub fun time : List HtmlAttr -> List HtmlNode -> HtmlNode
+time attrs children = element "time" attrs children
+
+pub fun u_ : List HtmlAttr -> List HtmlNode -> HtmlNode
+u_ attrs children = element "u" attrs children
+
+pub fun var_ : List HtmlAttr -> List HtmlNode -> HtmlNode
+var_ attrs children = element "var" attrs children
+
+pub fun ul : List HtmlAttr -> List HtmlNode -> HtmlNode
+ul attrs children = element "ul" attrs children
+
+pub fun ol : List HtmlAttr -> List HtmlNode -> HtmlNode
+ol attrs children = element "ol" attrs children
+
+pub fun li : List HtmlAttr -> List HtmlNode -> HtmlNode
+li attrs children = element "li" attrs children
+
+pub fun menu : List HtmlAttr -> List HtmlNode -> HtmlNode
+menu attrs children = element "menu" attrs children
+
+pub fun dl : List HtmlAttr -> List HtmlNode -> HtmlNode
+dl attrs children = element "dl" attrs children
+
+pub fun dt : List HtmlAttr -> List HtmlNode -> HtmlNode
+dt attrs children = element "dt" attrs children
+
+pub fun dd : List HtmlAttr -> List HtmlNode -> HtmlNode
+dd attrs children = element "dd" attrs children
+
+pub fun nav : List HtmlAttr -> List HtmlNode -> HtmlNode
+nav attrs children = element "nav" attrs children
+
+pub fun main_ : List HtmlAttr -> List HtmlNode -> HtmlNode
+main_ attrs children = element "main" attrs children
+
+pub fun search : List HtmlAttr -> List HtmlNode -> HtmlNode
+search attrs children = element "search" attrs children
+
+pub fun section : List HtmlAttr -> List HtmlNode -> HtmlNode
+section attrs children = element "section" attrs children
+
+pub fun article : List HtmlAttr -> List HtmlNode -> HtmlNode
+article attrs children = element "article" attrs children
+
+pub fun header : List HtmlAttr -> List HtmlNode -> HtmlNode
+header attrs children = element "header" attrs children
+
+pub fun footer : List HtmlAttr -> List HtmlNode -> HtmlNode
+footer attrs children = element "footer" attrs children
+
+pub fun aside : List HtmlAttr -> List HtmlNode -> HtmlNode
+aside attrs children = element "aside" attrs children
+
+pub fun figure : List HtmlAttr -> List HtmlNode -> HtmlNode
+figure attrs children = element "figure" attrs children
+
+pub fun figcaption : List HtmlAttr -> List HtmlNode -> HtmlNode
+figcaption attrs children = element "figcaption" attrs children
+
+pub fun details : List HtmlAttr -> List HtmlNode -> HtmlNode
+details attrs children = element "details" attrs children
+
+pub fun summary : List HtmlAttr -> List HtmlNode -> HtmlNode
+summary attrs children = element "summary" attrs children
+
+pub fun dialog : List HtmlAttr -> List HtmlNode -> HtmlNode
+dialog attrs children = element "dialog" attrs children
+
+pub fun button : List HtmlAttr -> List HtmlNode -> HtmlNode
+button attrs children = element "button" attrs children
+
+pub fun form : List HtmlAttr -> List HtmlNode -> HtmlNode
+form attrs children = element "form" attrs children
+
+pub fun fieldset : List HtmlAttr -> List HtmlNode -> HtmlNode
+fieldset attrs children = element "fieldset" attrs children
+
+pub fun legend : List HtmlAttr -> List HtmlNode -> HtmlNode
+legend attrs children = element "legend" attrs children
+
+pub fun label : List HtmlAttr -> List HtmlNode -> HtmlNode
+label attrs children = element "label" attrs children
+
+pub fun textarea : List HtmlAttr -> List HtmlNode -> HtmlNode
+textarea attrs children = element "textarea" attrs children
+
+pub fun select : List HtmlAttr -> List HtmlNode -> HtmlNode
+select attrs children = element "select" attrs children
+
+pub fun datalist : List HtmlAttr -> List HtmlNode -> HtmlNode
+datalist attrs children = element "datalist" attrs children
+
+pub fun optgroup : List HtmlAttr -> List HtmlNode -> HtmlNode
+optgroup attrs children = element "optgroup" attrs children
+
+pub fun option : List HtmlAttr -> List HtmlNode -> HtmlNode
+option attrs children = element "option" attrs children
+
+pub fun output : List HtmlAttr -> List HtmlNode -> HtmlNode
+output attrs children = element "output" attrs children
+
+pub fun progress : List HtmlAttr -> List HtmlNode -> HtmlNode
+progress attrs children = element "progress" attrs children
+
+pub fun meter : List HtmlAttr -> List HtmlNode -> HtmlNode
+meter attrs children = element "meter" attrs children
+
+pub fun table : List HtmlAttr -> List HtmlNode -> HtmlNode
+table attrs children = element "table" attrs children
+
+pub fun caption : List HtmlAttr -> List HtmlNode -> HtmlNode
+caption attrs children = element "caption" attrs children
+
+pub fun colgroup : List HtmlAttr -> List HtmlNode -> HtmlNode
+colgroup attrs children = element "colgroup" attrs children
+
+pub fun thead : List HtmlAttr -> List HtmlNode -> HtmlNode
+thead attrs children = element "thead" attrs children
+
+pub fun tbody : List HtmlAttr -> List HtmlNode -> HtmlNode
+tbody attrs children = element "tbody" attrs children
+
+pub fun tfoot : List HtmlAttr -> List HtmlNode -> HtmlNode
+tfoot attrs children = element "tfoot" attrs children
+
+pub fun tr : List HtmlAttr -> List HtmlNode -> HtmlNode
+tr attrs children = element "tr" attrs children
+
+pub fun th : List HtmlAttr -> List HtmlNode -> HtmlNode
+th attrs children = element "th" attrs children
+
+pub fun td : List HtmlAttr -> List HtmlNode -> HtmlNode
+td attrs children = element "td" attrs children
+
+pub fun canvas : List HtmlAttr -> List HtmlNode -> HtmlNode
+canvas attrs children = element "canvas" attrs children
+
+pub fun audio : List HtmlAttr -> List HtmlNode -> HtmlNode
+audio attrs children = element "audio" attrs children
+
+pub fun video : List HtmlAttr -> List HtmlNode -> HtmlNode
+video attrs children = element "video" attrs children
+
+pub fun picture : List HtmlAttr -> List HtmlNode -> HtmlNode
+picture attrs children = element "picture" attrs children
+
+pub fun map_ : List HtmlAttr -> List HtmlNode -> HtmlNode
+map_ attrs children = element "map" attrs children
+
+pub fun object_ : List HtmlAttr -> List HtmlNode -> HtmlNode
+object_ attrs children = element "object" attrs children
+
+pub fun iframe : List HtmlAttr -> List HtmlNode -> HtmlNode
+iframe attrs children = element "iframe" attrs children
+
+pub fun slot_el : List HtmlAttr -> List HtmlNode -> HtmlNode
+slot_el attrs children = element "slot" attrs children
+
+pub fun template : List HtmlAttr -> List HtmlNode -> HtmlNode
+template attrs children = element "template" attrs children
+
+pub fun selectedcontent : List HtmlAttr -> HtmlNode
+selectedcontent attrs = void_element "selectedcontent" attrs
+
+pub fun meta : List HtmlAttr -> HtmlNode
+meta attrs = void_element "meta" attrs
+
+pub fun base : List HtmlAttr -> HtmlNode
+base attrs = void_element "base" attrs
+
+pub fun link : List HtmlAttr -> HtmlNode
+link attrs = void_element "link" attrs
+
+pub fun area : List HtmlAttr -> HtmlNode
+area attrs = void_element "area" attrs
+
+pub fun img : List HtmlAttr -> HtmlNode
+img attrs = void_element "img" attrs
+
+pub fun input : List HtmlAttr -> HtmlNode
+input attrs = void_element "input" attrs
+
+pub fun br : List HtmlAttr -> HtmlNode
+br attrs = void_element "br" attrs
+
+pub fun hr : List HtmlAttr -> HtmlNode
+hr attrs = void_element "hr" attrs
+
+pub fun col : List HtmlAttr -> HtmlNode
+col attrs = void_element "col" attrs
+
+pub fun embed : List HtmlAttr -> HtmlNode
+embed attrs = void_element "embed" attrs
+
+pub fun source : List HtmlAttr -> HtmlNode
+source attrs = void_element "source" attrs
+
+pub fun track : List HtmlAttr -> HtmlNode
+track attrs = void_element "track" attrs
+
+pub fun wbr : List HtmlAttr -> HtmlNode
+wbr attrs = void_element "wbr" attrs
